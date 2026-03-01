@@ -43,4 +43,9 @@ FW_VERSIONS = {
       b'TeM3_SP_XP002p2_0.0.0 (23),XPR003.6.0',
     ],
   },
+  CAR.TESLA_MODEL_S_HW3: {
+    (Ecu.eps, 0x730, None): [
+      # TODO: populate from CAN logs
+    ],
+  },
 }

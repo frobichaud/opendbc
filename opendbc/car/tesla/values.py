@@ -40,6 +40,11 @@ class TeslaPlatformConfig(PlatformConfig):
   dbc_dict: DbcDict = field(default_factory=lambda: {Bus.party: 'tesla_model3_party'})
 
 
+@dataclass
+class TeslaLegacyPlatformConfig(PlatformConfig):
+  dbc_dict: DbcDict = field(default_factory=lambda: {Bus.party: 'tesla_raven_party', Bus.chassis: 'tesla_can'})
+
+
 class CAR(Platforms):
   TESLA_MODEL_3 = TeslaPlatformConfig(
     [
@@ -59,6 +64,10 @@ class CAR(Platforms):
   TESLA_MODEL_X = TeslaPlatformConfig(
     [TeslaCarDocsHW4("Tesla Model X (with HW4) 2024")],
     CarSpecs(mass=2495., wheelbase=2.960, steerRatio=12.0),
+  )
+  TESLA_MODEL_S_HW3 = TeslaLegacyPlatformConfig(
+    [TeslaCarDocsHW3("Tesla Model S (HW3 Raven) 2018-23")],
+    CarSpecs(mass=2100., wheelbase=2.960, steerRatio=15.0),
   )
 
 
@@ -119,11 +128,14 @@ class CarControllerParams:
 
 class TeslaSafetyFlags(IntFlag):
   LONG_CONTROL = 1
+  FLAG_HW3 = 32
 
 
 class TeslaFlags(IntFlag):
   LONG_CONTROL = 1
 
+
+LEGACY_CARS = {CAR.TESLA_MODEL_S_HW3}
 
 DBC = CAR.create_dbc_map()
 
