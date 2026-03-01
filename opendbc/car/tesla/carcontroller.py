@@ -5,7 +5,7 @@ from opendbc.car.lateral import apply_steer_angle_limits_vm
 from opendbc.car.interfaces import CarControllerBase
 from opendbc.car.tesla.teslacan import TeslaCAN
 from opendbc.car.tesla.teslacan_legacy import TeslaCANRaven
-from opendbc.car.tesla.values import CANBUS, CarControllerParams, LEGACY_CARS
+from opendbc.car.tesla.values import CANBUS, CarControllerParams, DBC, LEGACY_CARS
 from opendbc.car.vehicle_model import VehicleModel
 from opendbc.sunnypilot.car.tesla.mads import MadsCarController
 
@@ -28,7 +28,7 @@ class CarController(CarControllerBase, MadsCarController):
     if CP.carFingerprint in LEGACY_CARS:
       packers = {
         CANBUS.party: CANPacker(dbc_names[Bus.party]),
-        CANBUS.powertrain: CANPacker(dbc_names[Bus.pt]),
+        CANBUS.powertrain: CANPacker(DBC[CP.carFingerprint][Bus.pt]),
       }
       self.tesla_can = TeslaCANRaven(packers)
     else:
