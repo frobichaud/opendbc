@@ -4,7 +4,8 @@ from opendbc.car import Bus
 from opendbc.car.lateral import apply_steer_angle_limits_vm
 from opendbc.car.interfaces import CarControllerBase
 from opendbc.car.tesla.teslacan import TeslaCAN
-from opendbc.car.tesla.values import CarControllerParams, LEGACY_CARS
+from opendbc.car.tesla.teslacan_legacy import TeslaCANRaven
+from opendbc.car.tesla.values import CANBUS, CarControllerParams, LEGACY_CARS
 from opendbc.car.vehicle_model import VehicleModel
 from opendbc.sunnypilot.car.tesla.mads import MadsCarController
 
@@ -23,8 +24,16 @@ class CarController(CarControllerBase, MadsCarController):
     CarControllerBase.__init__(self, dbc_names, CP, CP_SP)
     MadsCarController.__init__(self)
     self.apply_angle_last = 0
-    self.packer = CANPacker(dbc_names[Bus.party])
-    self.tesla_can = TeslaCAN(self.packer)
+
+    if CP.carFingerprint in LEGACY_CARS:
+      packers = {
+        CANBUS.party: CANPacker(dbc_names[Bus.party]),
+        CANBUS.powertrain: CANPacker(dbc_names[Bus.pt]),
+      }
+      self.tesla_can = TeslaCANRaven(packers)
+    else:
+      self.packer = CANPacker(dbc_names[Bus.party])
+      self.tesla_can = TeslaCAN(self.packer)
 
     # Vehicle model used for lateral limiting
     self.VM = VehicleModel(get_safety_CP(CP.carFingerprint))
@@ -44,10 +53,18 @@ class CarController(CarControllerBase, MadsCarController):
       self.apply_angle_last = apply_steer_angle_limits_vm(actuators.steeringAngleDeg, self.apply_angle_last, CS.out.vEgoRaw, CS.out.steeringAngleDeg,
                                                           lat_active, CarControllerParams, self.VM)
 
-      can_sends.append(self.tesla_can.create_steering_control(self.apply_angle_last, lat_active, self.mads.control_type))
+      if self.CP.carFingerprint in LEGACY_CARS:
+        cntr = (self.frame // 2) % 16
+        can_sends.append(self.tesla_can.create_steering_control(cntr, self.apply_angle_last, lat_active, self.mads.control_type))
+      else:
+        can_sends.append(self.tesla_can.create_steering_control(self.apply_angle_last, lat_active, self.mads.control_type))
 
     if self.frame % 10 == 0:
-      can_sends.append(self.tesla_can.create_steering_allowed())
+      if self.CP.carFingerprint in LEGACY_CARS:
+        cntr = (self.frame // 10) % 16
+        can_sends.append(self.tesla_can.create_steering_allowed(cntr))
+      else:
+        can_sends.append(self.tesla_can.create_steering_allowed())
 
     # Longitudinal control
     if self.CP.openpilotLongitudinalControl:
@@ -59,7 +76,9 @@ class CarController(CarControllerBase, MadsCarController):
 
     else:
       # Increment counter so cancel is prioritized even without openpilot longitudinal
-      if CC.cruiseControl.cancel:
+      # NOTE: Legacy cars can't send cancel — DAS_control is on powertrain bus (bus 4),
+      # not reachable by C3's internal panda. Driver cancels via stalk.
+      if CC.cruiseControl.cancel and CS.das_control is not None:
         cntr = (CS.das_control["DAS_controlCounter"] + 1) % 8
         can_sends.append(self.tesla_can.create_longitudinal_command(13, 0, cntr, CS.out.vEgo, False))
 

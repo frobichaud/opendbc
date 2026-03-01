@@ -42,7 +42,7 @@ class TeslaPlatformConfig(PlatformConfig):
 
 @dataclass
 class TeslaLegacyPlatformConfig(PlatformConfig):
-  dbc_dict: DbcDict = field(default_factory=lambda: {Bus.party: 'tesla_raven_party', Bus.chassis: 'tesla_can'})
+  dbc_dict: DbcDict = field(default_factory=lambda: {Bus.party: 'tesla_raven_party', Bus.chassis: 'tesla_can', Bus.pt: 'tesla_powertrain'})
 
 
 class CAR(Platforms):
@@ -86,6 +86,10 @@ class CANBUS:
   party = 0
   vehicle = 1
   autopilot_party = 2
+  # Legacy Model S/X buses
+  powertrain = 4
+  chassis = 5
+  autopilot_powertrain = 6
 
 
 GEAR_MAP = {

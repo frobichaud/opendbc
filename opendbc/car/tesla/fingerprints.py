@@ -4,6 +4,13 @@ from opendbc.car.tesla.values import CAR
 
 Ecu = CarParams.Ecu
 
+# CAN-based fingerprints for legacy cars (EPS doesn't respond to UDS queries)
+FINGERPRINTS = {
+  CAR.TESLA_MODEL_S_HW3: [{
+    8: 8, 14: 8, 49: 3, 81: 3, 257: 3, 264: 8, 336: 8, 337: 8, 342: 8, 637: 3, 880: 8, 907: 8, 908: 8, 909: 8, 910: 8, 911: 8, 914: 8, 977: 8, 1160: 4,
+  }],
+}
+
 FW_VERSIONS = {
   CAR.TESLA_MODEL_3: {
     (Ecu.eps, 0x730, None): [
@@ -41,11 +48,6 @@ FW_VERSIONS = {
   CAR.TESLA_MODEL_X: {
     (Ecu.eps, 0x730, None): [
       b'TeM3_SP_XP002p2_0.0.0 (23),XPR003.6.0',
-    ],
-  },
-  CAR.TESLA_MODEL_S_HW3: {
-    (Ecu.eps, 0x730, None): [
-      # TODO: populate from CAN logs
     ],
   },
 }

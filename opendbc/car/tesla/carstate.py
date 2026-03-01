@@ -150,13 +150,13 @@ class CarState(CarStateBase):
 
     # Brake pedal from BrakeMessage on chassis bus
     ret.brake = 0
-    ret.brakePressed = cp_chassis.vl["BrakeMessage"]["driverBrakeStatus"] != 1  # 1 = NOT_APPLIED
+    ret.brakePressed = cp_chassis.vl["BrakeMessage"]["driverBrakeStatus"] == 2  # 2 = APPLIED
 
     # Steering wheel from EPAS_sysStatus on party bus
     epas_status = cp_party.vl["EPAS_sysStatus"]
     self.hands_on_level = epas_status["EPAS_handsOnLevel"]
     ret.steeringAngleDeg = -epas_status["EPAS_internalSAS"]
-    ret.steeringRateDeg = -cp_party.vl["STW_ANGLHP_STAT"]["StW_AnglHP_Spd"]
+    ret.steeringRateDeg = -cp_chassis.vl["STW_ANGLHP_STAT"]["StW_AnglHP_Spd"]
     ret.steeringTorque = -epas_status["EPAS_torsionBarTorque"]
 
     ret.steeringPressed = self.update_steering_pressed(abs(ret.steeringTorque) > STEER_THRESHOLD, 5)
@@ -189,24 +189,28 @@ class CarState(CarStateBase):
     # Gear from DI_torque2 on chassis bus
     ret.gearShifter = GEAR_MAP[self.shifter_values.get(int(cp_chassis.vl["DI_torque2"]["DI_gear"]), "DI_GEAR_INVALID")]
 
-    # Doors, blinkers, seatbelt not available in legacy DBCs
-    ret.doorOpen = False
-    ret.leftBlinker = False
-    ret.rightBlinker = False
+    # Doors from GTW_carState on chassis bus
+    gtw = cp_chassis.vl["GTW_carState"]
+    ret.doorOpen = any([gtw["DOOR_STATE_FL"], gtw["DOOR_STATE_FR"],
+                        gtw["DOOR_STATE_RL"], gtw["DOOR_STATE_RR"], gtw["DOOR_STATE_FrontTrunk"]])
+
+    # Blinkers from GTW_carState on chassis bus
+    ret.leftBlinker = gtw["BC_indicatorLStatus"] == 1
+    ret.rightBlinker = gtw["BC_indicatorRStatus"] == 1
+
+    # Seatbelt not reliably available on C3 visible buses
     ret.seatbeltUnlatched = False
 
     # Blindspot not available in legacy
     ret.leftBlindspot = False
     ret.rightBlindspot = False
 
-    # AEB from DAS_control on autopilot party bus
-    ret.stockAeb = cp_ap_party.vl["DAS_control"]["DAS_aebEvent"] == 1
+    # AEB: DAS_control is on powertrain bus (bus 4), not visible to C3's 3-bus panda.
+    # Stock AEB detection disabled for legacy cars without external panda.
+    ret.stockAeb = False
 
     # LKAS from DAS_steeringControl on autopilot party bus
     ret.stockLkas = cp_ap_party.vl["DAS_steeringControl"]["DAS_steeringControlType"] == 2  # LANE_KEEP_ASSIST
-
-    # Messages needed by carcontroller
-    self.das_control = copy.copy(cp_ap_party.vl["DAS_control"])
 
     return ret, ret_sp
 

@@ -109,16 +109,14 @@ static bool tesla_legacy_tx_hook(const CANPacket_t *msg) {
     int raw_angle_can = ((msg->data[0] & 0x7FU) << 8) | msg->data[1];
     int desired_angle = raw_angle_can - 16384;
     int steer_control_type = msg->data[2] >> 6;
-    bool steer_control_enabled = (steer_control_type == 1) ||  // ANGLE_CONTROL
-                                 (steer_control_type == 2);    // LANE_KEEP_ASSIST
+    bool steer_control_enabled = steer_control_type == 1;  // ANGLE_CONTROL
 
     if (steer_angle_cmd_checks_vm(desired_angle, steer_control_enabled, TESLA_LEGACY_STEERING_LIMITS, TESLA_LEGACY_STEERING_PARAMS)) {
       violation = true;
     }
 
     bool valid_steer_control_type = (steer_control_type == 0) ||  // NONE
-                                    (steer_control_type == 1) ||  // ANGLE_CONTROL
-                                    (steer_control_type == 2);    // LANE_KEEP_ASSIST
+                                    (steer_control_type == 1);    // ANGLE_CONTROL
     if (!valid_steer_control_type) {
       violation = true;
     }
@@ -230,22 +228,23 @@ static safety_config tesla_legacy_init(uint16_t param) {
   };
 
   // HW3 Raven: chassis bus = 1
+  // NOTE: DAS_control (0x2bf) is on powertrain bus (bus 4), not visible to C3's 3-bus panda.
+  // Stock AEB detection is disabled for legacy cars without an external panda.
   static RxCheck tesla_legacy_hw3_rx_checks[] = {
     {.msg = {{0x370, 0, 8, 100U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, { 0 }, { 0 }}},   // EPAS_sysStatus
     {.msg = {{0x155, 1, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, { 0 }, { 0 }}},    // ESP_B (speed)
     {.msg = {{0x20a, 1, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, { 0 }, { 0 }}},    // BrakeMessage
     {.msg = {{0x368, 1, 8, 10U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, { 0 }, { 0 }}},    // DI_state (cruise)
-    {.msg = {{0x2bf, 2, 8, 25U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, { 0 }, { 0 }}},    // DAS_control (stock AEB)
     {.msg = {{0x488, 2, 4, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, { 0 }, { 0 }}},    // DAS_steeringControl (stock LKAS)
   };
 
   // Default HW2: chassis bus = 0
+  // NOTE: DAS_control (0x2bf) is on powertrain bus, not visible without external panda.
   static RxCheck tesla_legacy_rx_checks[] = {
     {.msg = {{0x370, 0, 8, 100U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, { 0 }, { 0 }}},   // EPAS_sysStatus
     {.msg = {{0x155, 0, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, { 0 }, { 0 }}},    // ESP_B (speed)
     {.msg = {{0x20a, 0, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, { 0 }, { 0 }}},    // BrakeMessage
     {.msg = {{0x368, 0, 8, 10U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, { 0 }, { 0 }}},    // DI_state (cruise)
-    {.msg = {{0x2bf, 2, 8, 25U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, { 0 }, { 0 }}},    // DAS_control (stock AEB)
     {.msg = {{0x488, 2, 4, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, { 0 }, { 0 }}},    // DAS_steeringControl (stock LKAS)
   };
 
