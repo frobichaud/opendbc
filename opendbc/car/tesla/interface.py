@@ -14,7 +14,7 @@ class CarInterface(CarInterfaceBase):
     ret.brand = "tesla"
 
     if candidate in LEGACY_CARS:
-      ret.safetyConfigs = [get_safety_config(structs.CarParams.SafetyModel.teslaLegacy, TeslaSafetyFlags.FLAG_HW3)]
+      ret.safetyConfigs = [get_safety_config(structs.CarParams.SafetyModel.teslaLegacy, TeslaSafetyFlags.FLAG_HW3.value)]
     else:
       ret.safetyConfigs = [get_safety_config(structs.CarParams.SafetyModel.tesla)]
 
