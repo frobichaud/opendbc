@@ -25,7 +25,15 @@ class CarInterface(CarInterfaceBase):
     ret.steerControlType = structs.CarParams.SteerControlType.angle
     ret.radarUnavailable = True
 
-    if candidate not in LEGACY_CARS:
+    if candidate in LEGACY_CARS:
+      # Legacy cars (cable kit replaces AP computer) — openpilot must always
+      # control longitudinal since there is no stock ACC without the AP computer
+      ret.openpilotLongitudinalControl = True
+      ret.safetyConfigs[0].safetyParam |= TeslaSafetyFlags.LONG_CONTROL.value
+      ret.vEgoStopping = 0.1
+      ret.vEgoStarting = 0.1
+      ret.stoppingDecelRate = 0.3
+    else:
       ret.alphaLongitudinalAvailable = True
       if alpha_long:
         ret.openpilotLongitudinalControl = True
