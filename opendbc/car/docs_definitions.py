@@ -134,6 +134,7 @@ class CarHarness(EnumBase):
   obd_ii = BaseCarHarness("OBD-II connector", parts=[Cable.long_obdc_cable], has_connector=False)
   gm = BaseCarHarness("GM connector", parts=[Accessory.harness_box])
   gmsdgm = BaseCarHarness("GM SDGM connector", parts=[Accessory.harness_box, Accessory.comma_power, Cable.long_obdc_cable])
+  mg_a = BaseCarHarness("MG A connector")
   nissan_a = BaseCarHarness("Nissan A connector", parts=[Accessory.harness_box, Accessory.comma_power, Cable.long_obdc_cable])
   nissan_b = BaseCarHarness("Nissan B connector", parts=[Accessory.harness_box, Accessory.comma_power, Cable.long_obdc_cable])
   mazda = BaseCarHarness("Mazda connector")
@@ -143,6 +144,10 @@ class CarHarness(EnumBase):
   rivian_b = BaseCarHarness("Rivian B connector", parts=[Accessory.harness_box, Accessory.comma_power, Cable.long_obdc_cable])
   tesla_a = BaseCarHarness("Tesla A connector", parts=[Accessory.harness_box, Cable.long_obdc_cable])
   tesla_b = BaseCarHarness("Tesla B connector", parts=[Accessory.harness_box, Cable.long_obdc_cable])
+  tesla_model_s_hw1 = BaseCarHarness("Tesla Model S HW1 connector", parts=[Accessory.harness_box, Cable.long_obdc_cable])
+  tesla_model_x_hw1 = BaseCarHarness("Tesla Model X HW1 connector", parts=[Accessory.harness_box, Cable.long_obdc_cable])
+  tesla_model_sx_hw2 = BaseCarHarness("Tesla Model S/X HW2 connector", parts=[Accessory.harness_box, Cable.long_obdc_cable])
+  tesla_model_sx_hw3 = BaseCarHarness("Tesla Model S/X HW3 connector", parts=[Accessory.harness_box, Cable.long_obdc_cable])
   psa_a = BaseCarHarness("PSA A connector", parts=[Accessory.harness_box, Cable.long_obdc_cable])
 
   # custom harness
