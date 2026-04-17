@@ -59,6 +59,7 @@ class RadarInterface(RadarInterfaceBase):
 
     self.radar_off_can = CP.radarUnavailable
     self.rcp = get_radar_can_parser(CP)
+    self.last_radar_data: structs.RadarData | None = None
 
   def update(self, can_strings):
     if self.radar_off_can or self.rcp is None:
@@ -68,10 +69,14 @@ class RadarInterface(RadarInterfaceBase):
     self.updated_messages.update(vls)
 
     if self.trigger_msg not in self.updated_messages:
+      # Bosch trigger is 8 Hz, below the 20 Hz liveTracks service freq.
+      if self.bosch_radar:
+        return self.last_radar_data
       return None
 
     rr = self._update(self.updated_messages)
     self.updated_messages.clear()
+    self.last_radar_data = rr
 
     return rr
 
