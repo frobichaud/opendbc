@@ -85,7 +85,7 @@ def can_fingerprint(can_recv: CanRecvCallable) -> tuple[str | None, dict[int, di
 # **** for use live only ****
 def fingerprint(can_recv: CanRecvCallable, can_send: CanSendCallable, set_obd_multiplexing: ObdCallback,
                 cached_params: CarParamsT | None,
-                fixed_fingerprint: str | None) -> tuple[str | None, dict, str, list[CarParams.CarFw], CarParams.FingerprintSource, bool]:
+                fixed_fingerprint: str | None, num_pandas: int = 1) -> tuple[str | None, dict, str, list[CarParams.CarFw], CarParams.FingerprintSource, bool]:
   fixed_fingerprint = fixed_fingerprint or os.environ.get('FINGERPRINT', "")
   skip_fw_query = os.environ.get('SKIP_FW_QUERY', False)
   disable_fw_cache = os.environ.get('DISABLE_FW_CACHE', False)
@@ -106,8 +106,8 @@ def fingerprint(can_recv: CanRecvCallable, can_send: CanSendCallable, set_obd_mu
       set_obd_multiplexing(True)
       # VIN query only reliably works through OBDII
       vin_rx_addr, vin_rx_bus, vin = get_vin(can_recv, can_send, (0, 1))
-      ecu_rx_addrs = get_present_ecus(can_recv, can_send, set_obd_multiplexing)
-      car_fw = get_fw_versions_ordered(can_recv, can_send, set_obd_multiplexing, vin, ecu_rx_addrs)
+      ecu_rx_addrs = get_present_ecus(can_recv, can_send, set_obd_multiplexing, num_pandas=num_pandas)
+      car_fw = get_fw_versions_ordered(can_recv, can_send, set_obd_multiplexing, vin, ecu_rx_addrs, num_pandas=num_pandas)
       cached = False
 
     exact_fw_match, fw_candidates = match_fw_to_car(car_fw, vin)
@@ -153,9 +153,10 @@ def fingerprint(can_recv: CanRecvCallable, can_send: CanSendCallable, set_obd_mu
 
 def get_car(can_recv: CanRecvCallable, can_send: CanSendCallable, set_obd_multiplexing: ObdCallback, alpha_long_allowed: bool,
             is_release: bool, cached_params: CarParamsT | None = None,
-            fixed_fingerprint: str | None = None, init_params_list_sp: list[dict[str, str]] | None = None, is_release_sp: bool = False):
+            fixed_fingerprint: str | None = None, init_params_list_sp: list[dict[str, str]] | None = None, is_release_sp: bool = False,
+            num_pandas: int = 1):
   candidate, fingerprints, vin, car_fw, source, exact_match = fingerprint(can_recv, can_send, set_obd_multiplexing, cached_params,
-                                                                          fixed_fingerprint)
+                                                                          fixed_fingerprint, num_pandas=num_pandas)
 
   if candidate is None:
     carlog.error({"event": "car doesn't match any fingerprints", "fingerprints": repr(fingerprints)})
