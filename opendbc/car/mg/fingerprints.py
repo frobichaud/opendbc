@@ -26,8 +26,12 @@ FW_VERSIONS = {
       b'\x11\x03\t\x18\x01',
     ],
   },
-  CAR.MG_ZS: {
-    # TODO: populate via tools/car_porting/auto_fingerprint.py once a route
-    # with FW query enabled is captured on the 2025 MG ZS
-  },
+  # NOTE: MG_ZS has no FW fingerprint yet. An EMPTY FW_VERSIONS entry matches
+  # every FW query in match_fw_to_car_exact (its ecu loop never runs, so it is
+  # never invalidated), acting as a phantom 2nd candidate that breaks FW
+  # fingerprinting fork-wide (e.g. a real Tesla EPS match becomes ambiguous ->
+  # MOCK). Keep MG_ZS out of FW_VERSIONS until real FW is captured via
+  # tools/car_porting/auto_fingerprint.py.
+  # CAR.MG_ZS: {
+  # },
 }
