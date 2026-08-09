@@ -68,6 +68,20 @@ void ignition_can_hook(const CANPacket_t *msg) {
     }
   }
 
+  // Tesla Model S legacy (HW1/HW2/HW3 retrofit) exception
+  // GTW_status can appear on bus 0 or 1 depending on harness/kit wiring
+  if (((msg->bus == 0U) || (msg->bus == 1U)) && (msg->addr == 0x348U) && (GET_LEN(msg) == 8)) {
+    int counter = msg->data[6] & 0xFU;
+
+    static int prev_counter_tesla_legacy = -1;
+    if ((counter == ((prev_counter_tesla_legacy + 1) % 16)) && (prev_counter_tesla_legacy != -1)) {
+      // GTW_status->GTW_driveRailReq
+      ignition_can = (msg->data[0] & 0x1U) != 0U;
+      ignition_can_cnt = 0U;
+    }
+    prev_counter_tesla_legacy = counter;
+  }
+
   // TODO: this is too loose, Teslas have 0x222
   // body v2 exception
   // if (((msg->bus == 0U) || (msg->bus == 2U)) && (msg->addr == 0x222U)) {

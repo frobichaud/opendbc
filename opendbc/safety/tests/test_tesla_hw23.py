@@ -416,5 +416,49 @@ class TestTeslaHW3ExternalPandaSafety(TeslaLegacyLongitudinalBase):
     self.safety.init_tests()
 
 
+# GTW_status->GTW_driveRailReq ignition detection
+# (moved from panda board/drivers/can_common.h to opendbc safety/ignition.h upstream)
+class TestTeslaLegacyIgnition(unittest.TestCase):
+  TX_MSGS: list = []
+
+  def setUp(self):
+    self.safety = libsafety_py.libsafety
+    self.safety.init_tests()
+    self.packer = CANPackerSafety("tesla_can")
+
+  def _msg(self, counter, ign, bus=0):
+    return self.packer.make_can_msg_safety("GTW_status", bus,
+                                           {"GTW_statusCounter": counter,
+                                            "GTW_driveRailReq": ign})
+
+  def test_ignition_on(self):
+    for i in range(16):
+      self.safety.init_tests()
+      self.safety.ignition_can_hook(self._msg(i, 1))
+      self.assertFalse(self.safety.get_ignition_can())
+      self.safety.ignition_can_hook(self._msg((i + 1) % 16, 1))
+      self.assertTrue(self.safety.get_ignition_can())
+
+  def test_ignition_off(self):
+    self.safety.ignition_can_hook(self._msg(0, 1))
+    self.safety.ignition_can_hook(self._msg(1, 1))
+    self.assertTrue(self.safety.get_ignition_can())
+    self.safety.ignition_can_hook(self._msg(2, 0))
+    self.safety.ignition_can_hook(self._msg(3, 0))
+    self.assertFalse(self.safety.get_ignition_can())
+
+  def test_ignition_on_bus_1(self):
+    # xnor kit wiring can put GTW_status on bus 1
+    self.safety.ignition_can_hook(self._msg(4, 1, bus=1))
+    self.safety.ignition_can_hook(self._msg(5, 1, bus=1))
+    self.assertTrue(self.safety.get_ignition_can())
+
+  def test_ignition_ignored_on_bus_2(self):
+    self.safety.ignition_can_hook(self._msg(6, 0, bus=2))
+    self.safety.ignition_can_hook(self._msg(7, 1, bus=2))
+    self.safety.ignition_can_hook(self._msg(8, 1, bus=2))
+    self.assertFalse(self.safety.get_ignition_can())
+
+
 if __name__ == "__main__":
   unittest.main()
