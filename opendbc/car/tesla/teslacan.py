@@ -1,4 +1,4 @@
-from opendbc.car.common.conversions import Conversions as CV
+from opendbc.car.tesla.longcontrol import JerkRamp, long_set_speed
 from opendbc.car.tesla.values import CANBUS, CarControllerParams, TeslaFlags
 
 
@@ -13,10 +13,8 @@ def get_steer_ctrl_type(flags: int, ctrl_type: int) -> int:
 class TeslaCAN:
   def __init__(self, CP, packer):
     self.CP = CP
-    self.CCP = CarControllerParams
     self.packer = packer
-    self.jerk_upper = self.CCP.JERK_LIMIT_MAX
-    self.jerk_lower = self.CCP.JERK_LIMIT_MIN
+    self.jerk_ramp = JerkRamp()
 
   def create_steering_control(self, angle, enabled):
     # On FSD 14+, ANGLE_CONTROL behavior changed to allow user winddown while actuating.
@@ -31,25 +29,13 @@ class TeslaCAN:
 
     return self.packer.make_can_msg("DAS_steeringControl", CANBUS.party, values)
 
-  def create_longitudinal_command(self, acc_state, accel, counter, v_ego, active, gas_pressed):
-    from opendbc.car.interfaces import V_CRUISE_MAX
-
-    set_speed = max(v_ego * CV.MS_TO_KPH, 0)
-    if active:
-      set_speed = 0 if accel < 0 else V_CRUISE_MAX
-
-    if gas_pressed:
-      self.jerk_upper = self.jerk_lower = 0.0
-    else:
-      self.jerk_lower = max(self.jerk_lower - self.CCP.JERK_RAMP_RATE, self.CCP.JERK_LIMIT_MIN)
-      self.jerk_upper = min(self.jerk_upper + self.CCP.JERK_RAMP_RATE, self.CCP.JERK_LIMIT_MAX)
-
+  def create_longitudinal_command(self, acc_state, accel, counter, v_ego, active, cruise_override):
     values = {
-      "DAS_setSpeed": set_speed,
+      "DAS_setSpeed": long_set_speed(v_ego, active, accel, cruise_override),
       "DAS_accState": acc_state,
       "DAS_aebEvent": 0,
-      "DAS_jerkMin": self.jerk_lower,
-      "DAS_jerkMax": self.jerk_upper,
+      "DAS_jerkMin": CarControllerParams.JERK_LIMIT_MIN,
+      "DAS_jerkMax": self.jerk_ramp.update(cruise_override),
       "DAS_accelMin": accel,
       "DAS_accelMax": max(accel, 0),
       "DAS_controlCounter": counter,

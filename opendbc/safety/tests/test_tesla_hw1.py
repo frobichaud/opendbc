@@ -24,7 +24,7 @@ def round_angle(apply_angle, can_offset=0):
   return away_round(apply_angle_can + rnd_offset) * 0.1 - 1638.35
 
 
-class TestTeslaHW1Safety(common.PandaCarSafetyTest, common.AngleSteeringSafetyTest, common.LongitudinalAccelSafetyTest):
+class TestTeslaHW1Safety(common.CarSafetyTest, common.AngleSteeringSafetyTest, common.LongitudinalAccelSafetyTest):
   # HW1 configuration - based on tesla_legacy.h
   RELAY_MALFUNCTION_ADDRS = {0: (MSG_DAS_steeringControl, MSG_DAS_Control_HW1)}
   FWD_BLACKLISTED_ADDRS = {2: [MSG_DAS_steeringControl, MSG_DAS_Control_HW1]}
@@ -113,6 +113,11 @@ class TestTeslaHW1Safety(common.PandaCarSafetyTest, common.AngleSteeringSafetyTe
     values = {"DI_cruiseState": 2 if enable else 0}
     return self.packer.make_can_msg_safety("DI_state", 0, values)
 
+  def _acc_state_msg(self, enabled):
+    # acc_main_on latches on cruise STANDBY (MADS main-cruise gate)
+    values = {"DI_cruiseState": 1 if enabled else 0}
+    return self.packer.make_can_msg_safety("DI_state", 0, values)
+
   def _long_control_msg(self, set_speed, acc_state=0, jerk_limits=(0, 0), accel_limits=(0, 0), aeb_event=0, bus=0):
     # HW1 uses DAS_control message (0x2b9)
     values = {
@@ -160,7 +165,7 @@ class TestTeslaHW1Safety(common.PandaCarSafetyTest, common.AngleSteeringSafetyTe
         for eac_error_code in range(16):
           self.safety.set_controls_allowed(True)
 
-          should_disengage = hands_on_level >= 3 or (eac_status == 0 and eac_error_code == 9)
+          should_disengage = eac_status == 0 and eac_error_code == 9
           self.assertTrue(self._rx(self._angle_meas_msg(0, hands_on_level=hands_on_level, eac_status=eac_status,
                                                         eac_error_code=eac_error_code)))
           self.assertNotEqual(should_disengage, self.safety.get_controls_allowed())
@@ -180,20 +185,37 @@ class TestTeslaHW1Safety(common.PandaCarSafetyTest, common.AngleSteeringSafetyTe
       self.assertEqual(should_tx, self._tx(self._angle_cmd_msg(0, state=steer_control_type)))
 
   def test_stock_lkas_passthrough(self):
-    # TODO: make these generic passthrough tests
-    no_lkas_msg = self._angle_cmd_msg(0, state=False)
-    no_lkas_msg_cam = self._angle_cmd_msg(0, state=True, bus=2)
-    lkas_msg_cam = self._angle_cmd_msg(0, state=self.steer_control_types['LANE_KEEP_ASSIST'], bus=2)
+    # Broadened stock steering detection (per dzid26 vtb): ANY non-NONE control type
+    # from the stock system latches while OP is disengaged (rising edge); OP yields
+    # (forward stock, block own TX) until the stock system returns to NONE.
+    none_cmd = self._angle_cmd_msg(0, state=False)
+    none_cmd_cam = self._angle_cmd_msg(0, state=False, bus=2)
 
-    # stock system sends no LKAS -> no forwarding, and OP is allowed to TX
-    self.assertEqual(1, self._rx(no_lkas_msg_cam))
-    self.assertEqual(-1, self.safety.safety_fwd_hook(2, no_lkas_msg_cam.addr))
-    self.assertTrue(self._tx(no_lkas_msg))
+    for ctype in ('ANGLE_CONTROL', 'LANE_KEEP_ASSIST', 'EMERGENCY_LANE_KEEP'):
+      stock_cmd_cam = self._angle_cmd_msg(0, state=self.steer_control_types[ctype], bus=2)
 
-    # stock system sends LKAS -> forwarding, and OP is not allowed to TX
-    self.assertEqual(1, self._rx(lkas_msg_cam))
-    self.assertEqual(0, self.safety.safety_fwd_hook(2, lkas_msg_cam.addr))
-    self.assertFalse(self._tx(no_lkas_msg))
+      # stock inactive -> impersonation: block forwarding, OP may TX
+      self.safety.set_controls_allowed(False)
+      self.assertTrue(self._rx(none_cmd_cam))
+      self.assertEqual(-1, self.safety.safety_fwd_hook(2, none_cmd_cam.addr))
+      self.assertTrue(self._tx(none_cmd))
+
+      # stock steering rising edge while OP disengaged -> yield: forward stock, block OP TX
+      self.assertTrue(self._rx(stock_cmd_cam))
+      self.assertEqual(0, self.safety.safety_fwd_hook(2, stock_cmd_cam.addr))
+      self.assertFalse(self._tx(none_cmd))
+
+      # stock returns to NONE -> latch clears
+      self.assertTrue(self._rx(none_cmd_cam))
+      self.assertEqual(-1, self.safety.safety_fwd_hook(2, none_cmd_cam.addr))
+      self.assertTrue(self._tx(none_cmd))
+
+      # rising edge while OP is engaged is ignored (OP keeps control)
+      self.safety.set_controls_allowed(True)
+      self.assertTrue(self._rx(stock_cmd_cam))
+      self.assertEqual(-1, self.safety.safety_fwd_hook(2, stock_cmd_cam.addr))
+      self.assertTrue(self._tx(none_cmd))
+      self.assertTrue(self._rx(none_cmd_cam))
 
   def test_no_aeb(self):
     # Test that AEB events are blocked

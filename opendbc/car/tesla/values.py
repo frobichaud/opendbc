@@ -188,7 +188,7 @@ class CarControllerParams:
     # EPAS faults above this angle
     360,  # deg
     # limit angle rate to both prevent a fault and for low speed comfort (~12 mph rate down to 0 mph)
-    MAX_ANGLE_RATE=5,  # deg/20ms frame, EPS faults at 12 at a standstill
+    MAX_ANGLE_RATE=3,  # deg/20ms frame, EPS faults at 12; 3 is smoother at low speed
   )
 
   STEER_STEP = 2  # Angle command is sent at 50 Hz
@@ -196,7 +196,7 @@ class CarControllerParams:
   ACCEL_MIN = -3.48  # m/s^2
   JERK_LIMIT_MAX = 4.9  # m/s^3, ACC faults at 5.0
   JERK_LIMIT_MIN = -4.9  # m/s^3, ACC faults at 5.0
-  JERK_RAMP_RATE = JERK_LIMIT_MAX * 0.002  # m/s^3 per control step, for smooth gas override
+  JERK_RATE_UP = 1.0  # m/s^3 per second ramp rate after gas override (dzid26 vtb lineage)
 
 
 class TeslaLegacyParams(IntFlag):
