@@ -6,13 +6,15 @@ from opendbc.car.common.conversions import Conversions as CV
 from opendbc.car.interfaces import CarStateBase
 from opendbc.car.tesla.teslacan import get_steer_ctrl_type
 from opendbc.car.tesla.values import DBC, CANBUS, GEAR_MAP, STEER_THRESHOLD, TeslaFlags, TeslaLegacyParams, CAR, LEGACY_CARS
+from opendbc.sunnypilot.car.tesla.carstate_ext import CarStateExt
 
 ButtonType = structs.CarState.ButtonEvent.Type
 
 
-class CarState(CarStateBase):
+class CarState(CarStateBase, CarStateExt):
   def __init__(self, CP, CP_SP):
     super().__init__(CP, CP_SP)
+    CarStateExt.__init__(self, CP, CP_SP)
     self.cruise_override = False
     self.can_define = CANDefine(DBC[CP.carFingerprint][Bus.party])
 
@@ -162,6 +164,8 @@ class CarState(CarStateBase):
     # Messages needed by carcontroller
     self.das_control = copy.copy(cp_ap_party.vl["DAS_control"])
 
+    CarStateExt.update(self, ret, ret_sp, can_parsers)
+
     return ret, ret_sp
 
   def update_legacy(self, can_parsers) -> tuple[structs.CarState, structs.CarStateSP]:
@@ -259,20 +263,39 @@ class CarState(CarStateBase):
     # Messages needed by carcontroller
     self.das_control = copy.copy(cp_ap_pt.vl["DAS_control"])
 
+    # Tesla's fused speed limit from the Autopilot ECU (dashboard speed limit).
+    # On HW3-fingerprinted cars, AutopilotStatus (msg 921) is on bus 1 (vehicle), read via Bus.main.
+    # On other legacy cars, it's on bus 2 (autopilot_party), read via Bus.ap_party.
+    if self.CP.carFingerprint == CAR.TESLA_MODEL_S_HW3:
+      autopilot_status = can_parsers[Bus.main].vl["AutopilotStatus"]
+    else:
+      autopilot_status = cp_ap_party.vl["AutopilotStatus"]
+    fused_speed_limit = autopilot_status["DAS_fusedSpeedLimit"]
+    if 1 <= fused_speed_limit <= 150:  # 0 = UNKNOWN_SNA, 155 = NONE
+      if speed_units == "KPH":
+        ret_sp.speedLimit = fused_speed_limit * CV.KPH_TO_MS
+      elif speed_units == "MPH":
+        ret_sp.speedLimit = fused_speed_limit * CV.MPH_TO_MS
+
     return ret, ret_sp
 
   @staticmethod
   def get_can_parsers(CP, CP_SP):
     if CP.carFingerprint in LEGACY_CARS:
-      return {
+      parsers = {
         Bus.party: CANParser(DBC[CP.carFingerprint][Bus.party], [], CANBUS.party),
         Bus.ap_party: CANParser(DBC[CP.carFingerprint][Bus.party], [], CANBUS.autopilot_party),
         Bus.pt: CANParser(DBC[CP.carFingerprint][Bus.pt], [], CANBUS.powertrain),
         Bus.ap_pt: CANParser(DBC[CP.carFingerprint][Bus.pt], [], CANBUS.autopilot_powertrain),
         Bus.chassis: CANParser(DBC[CP.carFingerprint][Bus.chassis], [], CANBUS.chassis if CP.carFingerprint == CAR.TESLA_MODEL_S_HW3 else CANBUS.party),
       }
+      # HW3-fingerprinted cars broadcast AutopilotStatus (msg 921) on bus 1 (vehicle), not bus 2 (autopilot_party)
+      if CP.carFingerprint == CAR.TESLA_MODEL_S_HW3:
+        parsers[Bus.main] = CANParser(DBC[CP.carFingerprint][Bus.party], [], CANBUS.vehicle)
+      return parsers
 
     return {
       Bus.party: CANParser(DBC[CP.carFingerprint][Bus.party], [], CANBUS.party),
-      Bus.ap_party: CANParser(DBC[CP.carFingerprint][Bus.party], [], CANBUS.autopilot_party)
+      Bus.ap_party: CANParser(DBC[CP.carFingerprint][Bus.party], [], CANBUS.autopilot_party),
+      **CarStateExt.get_parser(CP, CP_SP),
     }
